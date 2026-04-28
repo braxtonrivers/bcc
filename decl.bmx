@@ -2888,7 +2888,10 @@ End Rem
 	End Method
 
 	Method IsImported:Int()
-		Return declImported And Not (instanceof And opt_apptype)
+		' generic instances should always emit code in the translation unit that
+		' instantiates them, even if the template class was imported (fixes #753, #617)
+		If instanceof Then Return False
+		Return declImported
 	End Method
 
 	Method IsCloseable:Int()
