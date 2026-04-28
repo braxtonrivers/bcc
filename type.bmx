@@ -2232,9 +2232,10 @@ Type TFunctionPtrType Extends TType
 			Return False
 		End If
 		
-		' same arg types?
+		' same arg types? (including Var modifier check, consistent with EqualsType fix for #681)
 		For Local i:Int = 0 Until func.argDecls.length
 			If Not func.argDecls[i].ty.equalsType(fdecl.argDecls[i].ty) Return False
+			If (func.argDecls[i].ty._flags & T_VAR) <> (fdecl.argDecls[i].ty._flags & T_VAR) Then Return False
 		Next
 		
 		' same return type?
