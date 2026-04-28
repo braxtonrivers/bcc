@@ -3326,7 +3326,8 @@ End Rem
 			' add default compare if required
 			Local list:TFuncDeclList = TFuncDeclList(FindDeclList("compare", , , SCOPE_CLASS_LOCAL))
 			
-			Local arg:TArgDecl = New TArgDecl.Create("o1", TType.MapToVarType(New TObjectType.Create(Self)), Null)
+			' use __ prefix to avoid collision with user-defined fields (fixes #683)
+			Local arg:TArgDecl = New TArgDecl.Create("__cmp_lhs", TType.MapToVarType(New TObjectType.Create(Self)), Null)
 			func = New TFuncDecl.CreateF("Compare", New TIntType, [arg], FUNC_METHOD)
 			func.generated = True
 			func.retType = New TIntType
@@ -3437,7 +3438,7 @@ End Rem
 			' cmp = DefaultComparator_Compare( _field, o1._field )
 			'
 			Local expr1:TExpr = New TIdentExpr.Create( fdecl.ident )
-			Local expr2:TExpr = New TIdentExpr.Create( "o1")
+			Local expr2:TExpr = New TIdentExpr.Create( "__cmp_lhs")
 			expr2 = New TIdentExpr.Create( fdecl.ident, expr2)
 			
 			If TEnumType(fdecl.ty) Then
@@ -3462,16 +3463,17 @@ End Rem
 	End Method
 
 	Method BuildStructDefaultComparatorCompare(isPrivate:Int = False)
-		Local arg1:TArgDecl = New TArgDecl.Create("o1", TType.MapToVarType(New TObjectType.Create(Self)), Null)
-		Local arg2:TArgDecl = New TArgDecl.Create("o2", TType.MapToVarType(New TObjectType.Create(Self)), Null)
+		' use __ prefix to avoid collision with user-defined fields like "o1"/"o2" (fixes #683)
+		Local arg1:TArgDecl = New TArgDecl.Create("__cmp_lhs", TType.MapToVarType(New TObjectType.Create(Self)), Null)
+		Local arg2:TArgDecl = New TArgDecl.Create("__cmp_rhs", TType.MapToVarType(New TObjectType.Create(Self)), Null)
 		Local func:TFuncDecl = New TFuncDecl.CreateF("DefaultComparator_Compare", New TIntType, [arg1, arg2], 0)
 		If isPrivate Then
 			func.attrs :| DECL_PRIVATE
 		End If
 
-		Local expr:TExpr = New TIdentExpr.Create( "o1")
+		Local expr:TExpr = New TIdentExpr.Create( "__cmp_lhs")
 		expr = New TIdentExpr.Create( "Compare" ,expr )
-		expr = New TFuncCallExpr.Create( expr, [New TIdentExpr.Create("o2")])
+		expr = New TFuncCallExpr.Create( expr, [New TIdentExpr.Create("__cmp_rhs")])
 		
 		Local returnStmt:TReturnStmt = New TReturnStmt.Create( expr )
 		returnStmt.generated = True
