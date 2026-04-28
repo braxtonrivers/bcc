@@ -2197,6 +2197,10 @@ Type TFunctionPtrType Extends TType
 		For Local a:Int = 0 Until func.argDecls.Length
 			' does our arg equal declared arg?
 			If Not func.argDecls[a].ty.EqualsType(tyfunc.argDecls[a].ty) Then Return False
+			' check Var modifier matches (fixes #681: assignment must not ignore Var differences)
+			If includingVar Then
+				If (func.argDecls[a].ty._flags & T_VAR) <> (tyfunc.argDecls[a].ty._flags & T_VAR) Then Return False
+			End If
 		Next
 		Return True
 	End Method
@@ -2205,11 +2209,13 @@ Type TFunctionPtrType Extends TType
 		If TFunctionPtrType( ty )
 			' declared function pointer
 			Local tyfunc:TFuncDecl = TFunctionPtrType(ty).func
+			' covariant return: our return type must extend target return type
 			If Not func.retType.ExtendsType(tyfunc.retType) Then Return False
 			If Not (func.argDecls.Length = tyfunc.argDecls.Length) Then Return False
 			For Local a:Int = 0 Until func.argDecls.Length
-				' does declared arg extend our arg?
-				If Not tyfunc.argDecls[a].ty.ExtendsType(func.argDecls[a].ty) Then Return False
+				' contravariant args: our arg type must be a supertype of target arg type
+				' i.e. target arg must extend our arg (fixes #664: variance was backwards)
+				If Not func.argDecls[a].ty.ExtendsType(tyfunc.argDecls[a].ty) Then Return False
 			Next
 			Return True
 		EndIf

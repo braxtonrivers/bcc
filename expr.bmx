@@ -2980,11 +2980,16 @@ Type TArrayExpr Extends TExpr
 			TFunctionPtrType(ty).func = TInvokeExpr(exprs[0]).decl
 
 			For Local i:Int=1 Until exprs.Length
-				If TIdentExpr(exprs[1]) Then
-					TIdentExpr(exprs[1]).isRhs = True
+				If TIdentExpr(exprs[i]) Then
+					TIdentExpr(exprs[i]).isRhs = True
 				End If
 				exprs[i]=exprs[i].Semant()
 				
+				' allow Null elements in function pointer arrays (fixes #626, #562)
+				If TNullType(exprs[i].exprType) Then
+					Continue
+				End If
+
 				If TInvokeExpr(exprs[i]) And Not TInvokeExpr(exprs[i]).invokedWithBraces
 					cp = TInvokeExpr(exprs[i]).decl
 					
@@ -3011,8 +3016,11 @@ Type TArrayExpr Extends TExpr
 
 			Local expr:TExpr = exprs[i]
 
-			' don't cast null types
+			' don't cast null types -- but allow Null in function pointer and object arrays (fixes #626, #562)
 			If TNullType(expr.exprType) <> Null Then
+				If TFunctionPtrType(ty) Or TObjectType(ty) Then
+					Continue
+				End If
 				Err "Auto array element has no type"
 			End If
 

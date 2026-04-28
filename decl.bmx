@@ -2735,10 +2735,15 @@ End Rem
 			End If
 		EndIf
 		
-		'look for existing instance
+		'look for existing instance (including placeholders being constructed, to prevent
+		'infinite recursion from recursive generic imports -- fixes #501)
 		For Local inst:TClassDecl=EachIn instances
 			Local equal:Int=True
 			For Local i:Int=0 Until args.Length
+				If Not inst.instArgs Or i >= inst.instArgs.Length Then
+					equal = False
+					Exit
+				End If
 				Local instArg:TType = inst.instArgs[i].Semant()
 				inst.instArgs[i] = instArg
 				
@@ -2767,6 +2772,16 @@ End Rem
 			templateDets = New TTemplateDets.Create(originalInstArgs, args)
 		End If
 
+		' create a placeholder instance and add it to the list BEFORE parsing,
+		' to prevent infinite recursion when ParseGeneric triggers another
+		' GenClassInstance call for the same type arguments (fixes #501)
+		Local placeholder:TClassDecl = New TClassDecl
+		placeholder.ident = ident
+		placeholder.instArgs = instArgs
+		placeholder.instanceof = Self
+		placeholder.attrs = attrs | DECL_SEMANTING
+		instances.AddLast placeholder
+
 		Local inst:TClassDecl = TClassDecl(TGenProcessor.processor.ParseGeneric(templateSource, templateDets))
 		inst.ident=ident
 		inst.args=Null
@@ -2783,6 +2798,9 @@ End Rem
 		inst.instanceof=Self
 		inst.instArgs=instArgs
 		inst.templateSource = templateSource
+		
+		' replace the placeholder with the fully constructed instance
+		instances.Remove placeholder
 		instances.AddLast inst
 
 		If instanceIdent Then
