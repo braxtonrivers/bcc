@@ -2602,7 +2602,11 @@ End Rem
 			Case "restoredata"
 				ParseRestoreDataStmt()
 			Default
-				If _toke.StartsWith("'!") Then
+				If _tokeType = TOKE_PRAGMA Then
+					' handle @bmk pragmas in statement context (fixes #656, #632)
+					ParsePragmaStmt()
+					Return
+				Else If _toke.StartsWith("'!") Then
 					If _tokeType = TOKE_NATIVE Then
 						ParseNativeStmt()
 					End If
@@ -4451,7 +4455,7 @@ End Rem
 			Default
 				If _tokeType = TOKE_PRAGMA Then
 					ParsePragmaStmt()
-					NextToke
+					' ParsePragmaStmt already calls NextToke, don't double-advance
 				Else
 					Exit
 				End If
