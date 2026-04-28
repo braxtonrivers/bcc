@@ -2119,15 +2119,14 @@ End Rem
 			End If
 		Else
 			' varty is NULL here for the casts. We will back-populate it later.
-'			init=New TAssignStmt.Create( "=",New TIdentExpr.Create( varid ),from )
-'			expr=New TBinaryCompareExpr.Create( op,New TIdentExpr.Create( varid ),New TCastExpr.Create( varty,term,1 ) )
-'			incr=New TAssignStmt.Create( "=",New TIdentExpr.Create( varid ),New TBinaryMathExpr.Create( "+",New TIdentExpr.Create( varid ),New TCastExpr.Create( varty,stp,1 ) ) )
+			' copy varExpr for each use to prevent shared mutable object issues
+			' when the loop variable is an indexed expression like intArray[0] (fixes #578)
 			init=New TAssignStmt.Create( "=",varExpr,from )
-			expr=New TBinaryCompareExpr.Create( op,varExpr,New TCastExpr.Create( varty,term,CAST_EXPLICIT ) )
+			expr=New TBinaryCompareExpr.Create( op,varExpr.Copy(),New TCastExpr.Create( varty,term,CAST_EXPLICIT ) )
 			If TUnaryExpr(stp) And TUnaryExpr(stp).op = "-" Then
-				incr=New TAssignStmt.Create( "=",varExpr,New TBinaryMathExpr.Create( "-",varExpr,New TCastExpr.Create( varty,TUnaryExpr(stp).expr,CAST_EXPLICIT ) ) )
+				incr=New TAssignStmt.Create( "=",varExpr.Copy(),New TBinaryMathExpr.Create( "-",varExpr.Copy(),New TCastExpr.Create( varty,TUnaryExpr(stp).expr,CAST_EXPLICIT ) ) )
 			Else
-				incr=New TAssignStmt.Create( "=",varExpr,New TBinaryMathExpr.Create( "+",varExpr,New TCastExpr.Create( varty,stp,CAST_EXPLICIT ) ) )
+				incr=New TAssignStmt.Create( "=",varExpr.Copy(),New TBinaryMathExpr.Create( "+",varExpr.Copy(),New TCastExpr.Create( varty,stp,CAST_EXPLICIT ) ) )
 			End If
 		EndIf
 
