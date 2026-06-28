@@ -244,7 +244,9 @@ Type TToker
 					If _tstr = "~q" Then
 						count :+ 1
 						If count = 3 Then
-							_line :+ lineCount - 1
+							' advance line counter by the number of newlines in the
+							' multi-line string (fixes #670: incorrect error line numbers)
+							_line :+ lineCount
 							Exit
 						End If
 					Else

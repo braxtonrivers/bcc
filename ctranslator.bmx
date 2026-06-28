@@ -1110,7 +1110,8 @@ Type TCTranslator Extends TTranslator
 					End If
 				Else
 					If TFunctionPtrType(gdecl.ty) Then
-						glob.Append("&brl_blitz_NullFunctionError")
+						' cast NullFunctionError to the correct function pointer type (fixes #662)
+						glob.Append( TransCast(TFunctionPtrType(gdecl.ty)) ).Append("(&brl_blitz_NullFunctionError)")
 					Else
 						glob.Append("0")
 					End If
@@ -5809,7 +5810,8 @@ End Rem
 							fld :+ "= &bbNullObject;"
 						End If
 					Else If TFunctionPtrType(decl.ty) Then
-						fld :+ "= &brl_blitz_NullFunctionError;"
+						' cast NullFunctionError to the correct function pointer type (fixes #662)
+						fld :+ "= " + TransCast(TFunctionPtrType(decl.ty)) + "(&brl_blitz_NullFunctionError);"
 					Else If TStringType(decl.ty) Then
 						fld :+ "= &bbEmptyString;"
 					Else If TArrayType(decl.ty) Then
@@ -7125,7 +7127,10 @@ End If
 			If TInvokeExpr(decl.init) And Not TInvokeExpr(decl.init).invokedWithBraces Then
 				Emit TransGlobal( decl )+"="+TInvokeExpr(decl.init).decl.munged + ";"
 			Else
-				Emit TransGlobal( decl )+"="+decl.init.Trans()+";"
+				' cast init expression to the correct function pointer type (fixes #686)
+				' this handles cases where a Byte Ptr-returning function is assigned to a
+				' typed function pointer global (e.g. dlsym wrappers)
+				Emit TransGlobal( decl )+"="+ TransCast(TFunctionPtrType(decl.ty)) + decl.init.Trans()+";"
 			End If
 		Else
 			If Not decl.funcGlobal Then

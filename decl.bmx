@@ -2801,10 +2801,15 @@ End Rem
 			End If
 		EndIf
 		
-		'look for existing instance
+		'look for existing instance (including placeholders being constructed, to prevent
+		'infinite recursion from recursive generic imports -- fixes #501)
 		For Local inst:TClassDecl=EachIn instances
 			Local equal:Int=True
 			For Local i:Int=0 Until args.Length
+				If Not inst.instArgs Or i >= inst.instArgs.Length Then
+					equal = False
+					Exit
+				End If
 				Local instArg:TType = inst.instArgs[i].Semant()
 				inst.instArgs[i] = instArg
 				
@@ -2833,6 +2838,16 @@ End Rem
 			templateDets = New TTemplateDets.Create(originalInstArgs, args)
 		End If
 
+		' create a placeholder instance and add it to the list BEFORE parsing,
+		' to prevent infinite recursion when ParseGeneric triggers another
+		' GenClassInstance call for the same type arguments (fixes #501)
+		Local placeholder:TClassDecl = New TClassDecl
+		placeholder.ident = ident
+		placeholder.instArgs = instArgs
+		placeholder.instanceof = Self
+		placeholder.attrs = attrs | DECL_SEMANTING
+		instances.AddLast placeholder
+
 		Local inst:TClassDecl = TClassDecl(TGenProcessor.processor.ParseGeneric(templateSource, templateDets))
 		inst.ident=ident
 		inst.args=Null
@@ -2849,6 +2864,9 @@ End Rem
 		inst.instanceof=Self
 		inst.instArgs=instArgs
 		inst.templateSource = templateSource
+		
+		' replace the placeholder with the fully constructed instance
+		instances.Remove placeholder
 		instances.AddLast inst
 
 		If instanceIdent Then
@@ -2936,7 +2954,10 @@ End Rem
 	End Method
 
 	Method IsImported:Int()
-		Return declImported And Not (instanceof And opt_apptype)
+		' generic instances should always emit code in the translation unit that
+		' instantiates them, even if the template class was imported (fixes #753, #617)
+		If instanceof Then Return False
+		Return declImported
 	End Method
 
 	Method IsCloseable:Int()
@@ -3371,7 +3392,8 @@ End Rem
 			' add default compare if required
 			Local list:TFuncDeclList = TFuncDeclList(FindDeclList("compare", , , SCOPE_CLASS_LOCAL))
 			
-			Local arg:TArgDecl = New TArgDecl.Create("o1", TType.MapToVarType(New TObjectType.Create(Self)), Null)
+			' use __ prefix to avoid collision with user-defined fields (fixes #683)
+			Local arg:TArgDecl = New TArgDecl.Create("__cmp_lhs", TType.MapToVarType(New TObjectType.Create(Self)), Null)
 			func = New TFuncDecl.CreateF("Compare", New TIntType, [arg], FUNC_METHOD)
 			func.generated = True
 			func.retType = New TIntType
@@ -3482,7 +3504,7 @@ End Rem
 			' cmp = DefaultComparator_Compare( _field, o1._field )
 			'
 			Local expr1:TExpr = New TIdentExpr.Create( fdecl.ident )
-			Local expr2:TExpr = New TIdentExpr.Create( "o1")
+			Local expr2:TExpr = New TIdentExpr.Create( "__cmp_lhs")
 			expr2 = New TIdentExpr.Create( fdecl.ident, expr2)
 			
 			If TEnumType(fdecl.ty) Then
@@ -3507,16 +3529,17 @@ End Rem
 	End Method
 
 	Method BuildStructDefaultComparatorCompare(isPrivate:Int = False)
-		Local arg1:TArgDecl = New TArgDecl.Create("o1", TType.MapToVarType(New TObjectType.Create(Self)), Null)
-		Local arg2:TArgDecl = New TArgDecl.Create("o2", TType.MapToVarType(New TObjectType.Create(Self)), Null)
+		' use __ prefix to avoid collision with user-defined fields like "o1"/"o2" (fixes #683)
+		Local arg1:TArgDecl = New TArgDecl.Create("__cmp_lhs", TType.MapToVarType(New TObjectType.Create(Self)), Null)
+		Local arg2:TArgDecl = New TArgDecl.Create("__cmp_rhs", TType.MapToVarType(New TObjectType.Create(Self)), Null)
 		Local func:TFuncDecl = New TFuncDecl.CreateF("DefaultComparator_Compare", New TIntType, [arg1, arg2], 0)
 		If isPrivate Then
 			func.attrs :| DECL_PRIVATE
 		End If
 
-		Local expr:TExpr = New TIdentExpr.Create( "o1")
+		Local expr:TExpr = New TIdentExpr.Create( "__cmp_lhs")
 		expr = New TIdentExpr.Create( "Compare" ,expr )
-		expr = New TFuncCallExpr.Create( expr, [New TIdentExpr.Create("o2")])
+		expr = New TFuncCallExpr.Create( expr, [New TIdentExpr.Create("__cmp_rhs")])
 		
 		Local returnStmt:TReturnStmt = New TReturnStmt.Create( expr )
 		returnStmt.generated = True
